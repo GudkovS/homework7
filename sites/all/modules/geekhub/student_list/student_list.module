@@ -1,0 +1,221 @@
+<?php
+
+/**
+ * Implements hook_menu()
+ */
+function student_list_menu()
+{
+    $items['student_list'] = array(
+        'title' => 'Student list',
+        'page callback' => 'student_list_table',
+        'type' => MENU_NORMAL_ITEM,
+        'access callback' => TRUE,
+    );
+    $items['student_list/default'] = array(
+        'type' => MENU_DEFAULT_LOCAL_TASK,
+        'title' => 'Student list tab',
+        'weight' => 0,
+    );
+    $items['student_list/add_student'] = array(
+        'title' => 'Add student form',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('student_list_add_one'),
+        'type' => MENU_LOCAL_TASK,
+        'access callback' => TRUE,
+        'weight' => 1,
+    );
+    $items['student_list/rss.xml'] = array(
+        'title' => 'RSS',
+        'page callback' => 'student_list_rss',
+        'type' => MENU_LOCAL_TASK,
+        'access callback' => TRUE,
+        'weight' => 2,
+    );
+
+
+    return $items;
+}
+
+function student_list_table() {
+    $sub_query = db_select('file_managed', 'fm');
+    $sub_query->fields('fm', array('fid', 'uri'));
+
+    $query = db_select('student_list_data', 'sl');
+    $query->fields('sl', array('document_id', 'pib', 'description', 'birthday_year', 'gender', 'student_group', 'average_score', 'photo_fid'));
+    $query->join($sub_query, 'fm', 'sl.photo_fid=fm.fid');
+    $query->fields('fm', array('fid', 'uri'));
+    $result = $query->execute();
+
+    $header = array('Document id', 'Name',  'Description', 'Birthday year', 'Gender', 'Group', 'Average score', 'Photo');
+    $rows = array();
+
+    foreach ($result as $student) {
+       // dpm($student);
+        $rows[] = array($student->document_id,
+                        $student->pib,
+                        $student->description,
+                        $student->birthday_year,
+                        $student->gender,
+                        $student->student_group,
+                        $student->average_score,
+                        //$student->photo_fid,
+                        theme('image_style', array(
+                            'style_name' => 'thumbnail',
+                            'path' => $student->uri,
+                            'attributes' => array('class' => array('image')),
+                            'getsize' => FALSE,
+                        ))
+        );
+    }
+
+    $output = theme('table', array('header' => $header, 'rows' => $rows));
+
+    return $output;
+}
+
+function student_list_add_one($form, &$form_state) {
+    $form['document_id'] = array(
+        '#type' => 'textfield',
+        '#title' => "Document id",
+        '#required' => 'True',
+    );
+    $form['pib'] = array(
+        '#type' => 'textfield',
+        '#title' => "Pib",
+        '#required' => 'True',
+    );
+    $form['description'] = array(
+        '#type' => 'textarea',
+        '#title' => "Description",
+    );
+    $form['birthday_year'] = array(
+        '#type' => 'textfield',
+        '#title' => "Birthday year",
+    );
+    $form['gender'] = array(
+        '#type' => 'radios',
+        '#title' => "Gender",
+        '#options' => array('M' => t('Male'), 'F' => t('Female')),
+        '#required' => 'True',
+    );
+    $form['student_group'] = array(
+        '#type' => 'textfield',
+        '#title' => "Student group",
+    );
+    $form['average_score'] = array(
+        '#type' => 'textfield',
+        '#title' => "Average score",
+    );
+    $form['photo_fid'] = array(
+        '#type' => 'managed_file',
+        '#title' => "Photo",
+        '#description' => t('Allowed extensions: gif png jpg jpeg'),
+        '#upload_location' => 'public://',
+        '#upload_validators' => array(
+            'file_validate_extensions' => array('gif png jpg jpeg'),
+            'file_validate_size' => array(100*1024),
+        ),
+    );
+
+    $form['submit'] = array(
+        '#type' => 'submit',
+        '#value' => 'Submit',
+    );
+
+    return $form;
+}
+
+
+function student_list_add_one_submit($form, &$form_state)
+{
+
+    // Load the file
+    $file = file_load($form_state['values']['photo_fid']);
+    $file->status = FILE_STATUS_PERMANENT;
+    file_save($file);
+
+    db_insert('student_list_data')
+        ->fields(array(
+            'document_id' => $form_state['values']['document_id'],
+            'pib' => $form_state['values']['pib'],
+            'description' => $form_state['values']['description'],
+            'birthday_year' => $form_state['values']['birthday_year'],
+            'gender' => $form_state['values']['gender'],
+            'student_group' => $form_state['values']['student_group'],
+            'average_score' => $form_state['values']['average_score'],
+            'photo_fid' => $form_state['values']['photo_fid'],
+        ))
+        ->execute();
+
+    //dpm($form_state);
+
+    drupal_goto('student_list');
+}
+
+
+function student_list_add_one_validate($form, &$form_state) {
+    if (!is_numeric($form_state['values']['document_id'])) {
+        form_set_error('document_id', 'Document id must be NUMBER!');
+    }
+
+    if (is_float(++$form_state['values']['document_id'])) {
+        form_set_error('document_id', 'Document id must be INTEGER number!');
+    }
+
+    if (!is_numeric($form_state['values']['birthday_year']) || $form_state['values']['birthday_year'] < 1901 || $form_state['values']['birthday_year'] > 2155) {
+        form_set_error('birthday_year', 'Birthday year must be number in the RANGE 1901 to 2155!');
+    }
+
+    if (is_float(++$form_state['values']['birthday_year'])) {
+        form_set_error('document_id', 'Birthday year must be INTEGER number!');
+    }
+
+    if (!is_numeric($form_state['values']['average_score'])) {
+        form_set_error('average_score', 'Average score must be NUMBER!');
+    }
+
+}
+
+// RSS
+function student_list_rss() {
+
+    // get student info from DB
+    $sub_query = db_select('file_managed', 'fm');
+    $sub_query->fields('fm', array('fid', 'uri'));
+
+    $query = db_select('student_list_data', 'sl');
+    $query->fields('sl', array('document_id', 'pib', 'description', 'birthday_year', 'gender', 'student_group', 'average_score', 'photo_fid'));
+    $query->join($sub_query, 'fm', 'sl.photo_fid=fm.fid');
+    $query->fields('fm', array('fid', 'uri'));
+    $result = $query->execute();
+
+    global $base_url;
+
+    $rss_output = '<?xml version="1.0" encoding="utf-8"?>
+    <rss version="2.0" xml:base="http://localhost/homework5"  xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <channel>
+     <title>Geekhub homeworks</title>
+     <link>' . $base_url . '/student_list/rss.xml</link>
+     <language>en</language>';
+
+    foreach ($result as $student) {
+        // dpm($student);
+        $rss_output .= '<item>';
+        $rss_output .= '<title>' . $student->pib . '</title>';
+        $rss_output .= '<link>' . $base_url . '/student_list</link>';
+        //$rss_output .= '<photo_fid>' . $student->photo_fid . '</photo_fid>';
+        $rss_output .= '<description><div>' . theme('image_style', array(
+                'style_name' => 'thumbnail',
+                'path' => $student->uri,
+                'attributes' => array('class' => array('image')),
+                'getsize' => FALSE,
+            )) . '</div>';
+        $rss_output .= '<div>' . $student->description . '</div></description>';
+        $rss_output .= '</item>';
+    }
+
+    $rss_output .= '  </channel></rss>';
+
+    //echo '<pre>' . $rss_output . '</pre>';
+    echo $rss_output;
+}
