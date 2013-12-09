@@ -24,9 +24,9 @@ function student_list_menu()
         'access callback' => TRUE,
         'weight' => 1,
     );
-    $items['student_list/rss.xml'] = array(
-        'title' => 'RSS',
-        'page callback' => 'student_list_rss',
+    $items['student_list/rss_old.xml'] = array(
+        'title' => 'RSS_old',
+        'page callback' => 'student_list_rss_old',
         'type' => MENU_LOCAL_TASK,
         'access callback' => TRUE,
         'weight' => 2,
@@ -177,7 +177,7 @@ function student_list_add_one_validate($form, &$form_state) {
 }
 
 // RSS
-function student_list_rss() {
+function student_list_rss_old() {
 
     // get student info from DB
     $sub_query = db_select('file_managed', 'fm');
@@ -203,14 +203,27 @@ function student_list_rss() {
         $rss_output .= '<item>';
         $rss_output .= '<title>' . $student->pib . '</title>';
         $rss_output .= '<link>' . $base_url . '/student_list</link>';
-        //$rss_output .= '<photo_fid>' . $student->photo_fid . '</photo_fid>';
-        $rss_output .= '<description><div>' . theme('image_style', array(
+        /*$rss_output .= '<description><div>' . theme('image_style', array(
                 'style_name' => 'thumbnail',
                 'path' => $student->uri,
                 'attributes' => array('class' => array('image')),
                 'getsize' => FALSE,
             )) . '</div>';
-        $rss_output .= '<div>' . $student->description . '</div></description>';
+        */
+        //$rss_output .= '<description><div>' . $student->description . '</div></description>';
+
+
+        //$rss_output .= '<description>' . $student->description . '</description>';
+
+        //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        //подставить свое значение для фото и описания
+        //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        $rss_output .= '<description>' . '&lt;div &gt;&lt;div &gt;&lt;div rel="og:image rdfs:seeAlso"
+        resource="http://localhost/homework5/sites/default/files/styles/large/public/field/image/cat_3.jpg?itok=dW1wA83a";
+        &gt;&lt;img typeof="foaf:Image" src="http://localhost/homework5/sites/default/files/styles/large/public/field/image/cat_3.jpg?itok=dW1wA83a" width="480"; height="360" /&gt;&lt;/div&gt;
+        &lt;/div&gt;&lt;/div&gt;&lt;div &gt;&lt;div &gt;&lt;div property="
+        content:encoded"&gt;&lt;p&gt;Kitty 3 body&lt;/p&gt;' . '</description>';
+
         $rss_output .= '</item>';
     }
 
