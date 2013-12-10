@@ -34,12 +34,15 @@ function student_list_rss() {
 
     foreach ($result as $student) {
 
+        //обрезаем текст описания до 600 символов
+        $summary = text_summary($student->description, NULL, 600);
+
         $student_descr = theme('image_style', array(
                 'style_name' => 'thumbnail',
                 'path' => $student->uri,
                 'attributes' => array('class' => array('image')),
                 'getsize' => FALSE,
-            )) . '</br>' . $student->description;
+            )) . '</br>' . $summary;
 
         $items .= format_rss_item($student->pib, $base_url . '/student_list', $student_descr);
     }
